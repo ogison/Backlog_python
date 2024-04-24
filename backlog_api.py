@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+# import pprint
 from datetime import datetime
 
 start_date = '2024-04-22T00:00:00Z'
@@ -11,13 +12,13 @@ api_key = ''
 project_name = ''
 directory = 'output'
 
-"""
-setting_json（設定ファイル）を読み込み
-"""
+''' setting_json（設定ファイル）を読み込み
+'''
 def read_setting():
     global start_date
     global end_date
     global api_key
+    global project_name
 
     with open(file_path, 'r') as file:
         setting_data = json.load(file)
@@ -27,50 +28,71 @@ def read_setting():
     api_key = setting_data['api_key']
     project_name = setting_data['project_name']
 
-"""
-日付の比較 
-d1 > d2 : True
-d1 < d2 : False
-"""
+''' 日付の比較 
+Args:
+    d1 : 日付
+    d2 : 日付
+
+Returns: 
+    d1 > d2 : True
+    d1 < d2 : False
+'''
 def date_comparison(d1, d2):
-    date1 = datetime.strptime(d1, "%Y-%m-%dT%H;%M:%SZ")
-    date2 = datetime.strptime(d2, "%Y-%m-%dT%H;%M:%SZ")
+    date1 = datetime.strptime(d1, '%Y-%m-%dT%H:%M:%SZ')
+    date2 = datetime.strptime(d2, '%Y-%m-%dT%H:%M:%SZ')
 
     if date1 > date2:
         return True
     else:
         return False
+    
+''' フォルダの作成 
+Args:
+    dir : フォルダ名
+'''
+def make_directory(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
 
-def check_expired_tichket(user_id, user_name):
+''' 期限切れのチケットをテキストファイルに出力 
+Args:
+    count : 確認するチケット数
+'''
+def check_expired_tichket(count):
     payload = {
         'apiKey' : api_key,
-        'count'  : user_id
+        'count'  : count
     }
 
-    response = requests.get(f"https://{project_name}.backlog.jp//api/v2/issues", payload)
+    response = requests.get(f'https://{project_name}.backlog.jp//api/v2/issues', payload)
     json_list = response.json()
 
     output_txt = ''
 
     for json in json_list:
-        ticket_name = json['summary']
-        issue_key = json['issueKey']
         due_date = json['dueDate']
-
-        if date_comparison(start_date, due_date):
-            output_txt += user_name + ':' + issue_key + " " + ticket_name + " " + str(due_date) + '\n'
+                
+        if due_date is not None:
+            if date_comparison(start_date, due_date):
+                ticket_name = json['summary']
+                issue_key = json['issueKey']
+                assignee = json['assignee']['name']
+                output_txt += f'ユーザ名：{assignee} チケット名：{issue_key} {ticket_name}\n'
     
-    file_path = f'{directory}/expired/{user_name}.txt'
+    make_directory(f'{directory}/expired')
+    file_path = f'{directory}/expired/expired_ticket_list.txt'
     if not os.path.exists(file_path):
-        with open(file_path, "x") as f:
+        with open(file_path, 'x') as f:
             f.write(output_txt)
     else:
-        with open(file_path, "w") as f:
+        with open(file_path, 'w') as f:
             f.write(output_txt)
 
 def main():
+    help(read_setting)
     read_setting()
-    print(start_date)
+    make_directory(directory)
+    check_expired_tichket(10)
 
 if __name__ == '__main__':
     main()
